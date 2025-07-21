@@ -14,7 +14,7 @@ from dashboard import DashboardPage
 from members_page import MembersPage
 from settings import SettingsPage
 from system_tray import SystemTrayIcon
-from config_manager import load_title
+from config_manager import load_title, load_admin_mode
 
 
 class DatabaseSetup:
@@ -122,14 +122,15 @@ class NavigationDrawer(QFrame):
         self.logout_button.setStyleSheet(f"""
             QPushButton {{
                 padding: 10px 8px; 
-                color: {c.WIN_COLOR_TEXT_SECONDARY};
+                color: {c.WIN_COLOR_ACCENT_TEXT_ON_PRIMARY};
+                background-color: #FD5E53;
                 border-radius: {c.WIN_BORDER_RADIUS};
                 border: none;
                 text-align: left;
+                font-weight: bold;
             }}
             QPushButton:hover {{
-                background-color: {c.WIN_COLOR_CONTROL_BG_HOVER};
-                color: {c.WIN_COLOR_TEXT_PRIMARY};
+                background-color: #E04B40; /* Darker version of the new color */
             }}
         """)
         self.logout_button.clicked.connect(self.logout_requested.emit)
@@ -216,6 +217,7 @@ class MainWindow(QMainWindow):
         self.dashboard_page = DashboardPage(self)
         self.members_page = MembersPage(self)
         self.settings_page = SettingsPage(self)
+        self.settings_page.admin_mode_changed.connect(self._set_admin_mode)
 
         self.pages = {
             "Dashboard": self.dashboard_page,
@@ -237,12 +239,15 @@ class MainWindow(QMainWindow):
 
         self.setup_tray_icon()
 
+        # Set initial admin mode state for all pages
+        self._set_admin_mode(load_admin_mode())
+
     def setup_tray_icon(self):
         """Creates the system tray icon and connects its signals."""
         icon_path = "icons/app_icon.ico"
         self.tray_icon = SystemTrayIcon(icon_path, self)
         self.tray_icon.show_action.triggered.connect(self.restore_window)
-        self.tray_icon.quit_action.triggered.connect(QApplication.instance().quit)
+        self.tray_icon.quit_action.triggered.connect(self.close)
         self.tray_icon.activated.connect(self.on_tray_icon_activated)
 
     def on_tray_icon_activated(self, reason):
@@ -263,14 +268,25 @@ class MainWindow(QMainWindow):
             self.stacked_content_area.setCurrentWidget(self.pages[page_name])
 
     def confirm_logout(self):
-        """Shows a confirmation dialog before closing the application."""
-        reply = QMessageBox.question(self, "Confirm Logout",
-                                     "Are you sure you want to log out and exit?",
+        """Triggers the application's close event."""
+        self.close()
+
+    def closeEvent(self, event):
+        """Overrides the default close event to ask for confirmation."""
+        reply = QMessageBox.question(self, "Confirm Exit",
+                                     "Are you sure you want to exit the application?",
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                      QMessageBox.StandardButton.No)
 
         if reply == QMessageBox.StandardButton.Yes:
-            QApplication.instance().quit()
+            event.accept()  # Close the application.
+        else:
+            event.ignore()  # Cancel the close event.
+
+    def _set_admin_mode(self, is_unlocked):
+        """Tells all relevant pages to update their UI based on admin mode."""
+        self.settings_page.update_admin_mode_ui(is_unlocked)
+        self.members_page.update_admin_mode_ui(is_unlocked)
 
     def show_status_message(self, message, timeout=3000):
         self.statusBar().showMessage(message, timeout)

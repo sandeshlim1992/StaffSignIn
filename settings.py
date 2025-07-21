@@ -1,5 +1,5 @@
 import os
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QFrame,
     QPushButton, QFileDialog, QMessageBox
@@ -9,14 +9,16 @@ from PySide6.QtGui import QFont
 import constants as c
 from config_manager import (
     load_path, save_setting, load_password, PASSWORD_KEY, PATH_KEY,
-    load_title, TITLE_KEY
+    load_title, TITLE_KEY, load_admin_mode, ADMIN_MODE_KEY
 )
+from admin_switch import AdminSwitch
 
 
 class SettingsPage(QWidget):
     """
     A page for application settings, including a customizable save location and Excel password.
     """
+    admin_mode_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -64,12 +66,12 @@ class SettingsPage(QWidget):
             }}
         """)
 
-        save_title_button = QPushButton("Save Title")
-        save_title_button.clicked.connect(self.save_app_title)
+        self.save_title_button = QPushButton("Save Title")
+        self.save_title_button.clicked.connect(self.save_app_title)
 
         title_layout.addWidget(title_field_label)
         title_layout.addWidget(self.title_input, 1)
-        title_layout.addWidget(save_title_button)
+        title_layout.addWidget(self.save_title_button)
         general_layout.addLayout(title_layout)
         main_layout.addWidget(general_frame)
 
@@ -110,12 +112,12 @@ class SettingsPage(QWidget):
             }}
         """)
 
-        browse_button = QPushButton("Browse...")
-        browse_button.clicked.connect(self.select_directory)
+        self.browse_button = QPushButton("Browse...")
+        self.browse_button.clicked.connect(self.select_directory)
 
         path_layout.addWidget(path_label)
         path_layout.addWidget(self.path_display, 1)
-        path_layout.addWidget(browse_button)
+        path_layout.addWidget(self.browse_button)
 
         frame_layout.addLayout(path_layout)
 
@@ -138,15 +140,46 @@ class SettingsPage(QWidget):
             }}
         """)
 
-        save_password_button = QPushButton("Save Password")
-        save_password_button.clicked.connect(self.save_excel_password)
+        self.save_password_button = QPushButton("Save Password")
+        self.save_password_button.clicked.connect(self.save_excel_password)
 
         password_layout.addWidget(password_label)
         password_layout.addWidget(self.password_input, 1)
-        password_layout.addWidget(save_password_button)
+        password_layout.addWidget(self.save_password_button)
 
         frame_layout.addLayout(password_layout)
         main_layout.addWidget(settings_frame)
+
+        # --- Security Section ---
+        security_frame = QFrame()
+        security_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {c.WIN_COLOR_WIDGET_BG};
+                border-radius: 8px;
+                border: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
+            }}
+        """)
+        security_layout = QVBoxLayout(security_frame)
+        security_layout.setSpacing(15)
+
+        security_section_label = QLabel("Security")
+        security_section_label.setFont(QFont(c.WIN_FONT_FAMILY, 12, QFont.Bold))
+        security_section_label.setStyleSheet("border: none;")
+        security_layout.addWidget(security_section_label)
+
+        admin_mode_layout = QHBoxLayout()
+        admin_mode_label = QLabel("Admin Mode:")
+        admin_mode_label.setStyleSheet("border: none;")
+
+        self.admin_switch = AdminSwitch()
+        self.admin_switch.set_unlocked(load_admin_mode())
+        self.admin_switch.toggled.connect(self._on_admin_mode_changed)
+
+        admin_mode_layout.addWidget(admin_mode_label)
+        admin_mode_layout.addWidget(self.admin_switch)
+        admin_mode_layout.addStretch()
+        security_layout.addLayout(admin_mode_layout)
+        main_layout.addWidget(security_frame)
 
     def select_directory(self):
         """Opens a dialog to select a new save directory."""
@@ -178,3 +211,14 @@ class SettingsPage(QWidget):
         save_setting(TITLE_KEY, new_title)
         QMessageBox.information(self, "Title Saved",
                                 "The new application title has been saved.\nPlease restart the application for the change to take effect.")
+
+    def _on_admin_mode_changed(self, is_unlocked):
+        """Saves and emits the admin mode state when the switch is toggled."""
+        save_setting(ADMIN_MODE_KEY, str(is_unlocked))
+        self.admin_mode_changed.emit(is_unlocked)
+
+    def update_admin_mode_ui(self, is_unlocked):
+        """Enables or disables settings controls based on admin mode."""
+        self.save_title_button.setEnabled(is_unlocked)
+        self.browse_button.setEnabled(is_unlocked)
+        self.save_password_button.setEnabled(is_unlocked)

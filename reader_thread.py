@@ -14,6 +14,7 @@ class PaxtonReaderThread(QThread):
     """
     This thread runs in the background, listens to the Paxton reader,
     and emits a signal containing the token number when a card is swiped.
+    It now includes automatic reconnection logic.
     """
     token_read_signal = Signal(int)
     error_signal = Signal(str)
@@ -22,16 +23,19 @@ class PaxtonReaderThread(QThread):
     def __init__(self):
         super().__init__()
         self._is_running = True
+        self.is_connected = False
         self.subscriber = None
         self.event_handler = None
+        self.paxton_lib = None
 
     def run(self):
-        """The main logic of the thread."""
+        """The main logic of the thread, now a connection management loop."""
         if not clr:
             self.error_signal.emit("The 'pythonnet' library is required but not found.")
             return
 
         try:
+            # --- Load Paxton DLLs once ---
             script_dir = os.path.dirname(os.path.abspath(__file__))
             all_files = os.listdir(script_dir)
             for file in all_files:
@@ -41,38 +45,57 @@ class PaxtonReaderThread(QThread):
                     except Exception:
                         pass
 
+            # Import the necessary class
             from Paxton.Net2.DesktopReaderClient import DesktopReaderSubscriber
-
-            self.subscriber = DesktopReaderSubscriber()
-            self.event_handler = self.on_token_read_event
-            self.subscriber.TokenReadEvent += self.event_handler
-
-            self.subscriber.SubscribeToReaderService()
-            self.subscriber.AcceptTokenReadEvents(True)
-            self.status_signal.emit("Paxton Reader is active and listening.")
-
-            while self._is_running:
-                time.sleep(0.1)
-
+            self.paxton_lib = DesktopReaderSubscriber
         except Exception as e:
-            error_message = f"Paxton Reader Thread Error:\n{traceback.format_exc()}"
+            error_message = f"Failed to load Paxton libraries:\n{traceback.format_exc()}"
             self.error_signal.emit(error_message)
-        finally:
-            self.cleanup()
+            return
+
+        # --- Main Connection Loop ---
+        while self._is_running:
+            if not self.is_connected:
+                try:
+                    self.status_signal.emit("Attempting to connect to reader...")
+
+                    self.subscriber = self.paxton_lib()
+                    self.event_handler = self.on_token_read_event
+                    self.subscriber.TokenReadEvent += self.event_handler
+                    self.subscriber.SubscribeToReaderService()
+                    self.subscriber.AcceptTokenReadEvents(True)
+
+                    self.is_connected = True
+                    self.status_signal.emit("Paxton Reader is active and listening.")
+
+                except Exception:
+                    self.status_signal.emit("Connection failed. Retrying in 5s...")
+                    self._cleanup_subscriber()  # Ensure partial connections are cleaned up
+                    time.sleep(5)
+            else:
+                # Connection is active, sleep for a bit before checking again
+                time.sleep(1)
+
+        self._cleanup_subscriber()  # Final cleanup when the thread stops
 
     def on_token_read_event(self, card_number, wiegand_no, token_type):
         """
-        This is the callback function that fires when a card is read.
-        It emits the signal with the token number.
+        This is the callback function. If it fails, we assume the connection
+        is lost and signal the run loop to reconnect.
         """
-        self.token_read_signal.emit(card_number)
+        try:
+            self.token_read_signal.emit(card_number)
+        except Exception:
+            # An error here likely means the connection to the service was lost.
+            self.status_signal.emit("Reader connection lost. Attempting to reconnect...")
+            self.is_connected = False
 
     def stop(self):
         """Stops the thread gracefully."""
         self.status_signal.emit("Stopping reader thread...")
         self._is_running = False
 
-    def cleanup(self):
+    def _cleanup_subscriber(self):
         """Unsubscribes and disposes of the reader object."""
         if self.subscriber:
             try:
@@ -82,6 +105,9 @@ class PaxtonReaderThread(QThread):
                     self.subscriber.UnsubscribeFromReaderService()
                 if hasattr(self.subscriber, 'Dispose'):
                     self.subscriber.Dispose()
-                self.status_signal.emit("Reader thread stopped.")
-            except Exception as e:
-                self.error_signal.emit(f"Error during cleanup: {e}")
+            except Exception:
+                pass  # Ignore errors during cleanup
+            finally:
+                self.subscriber = None
+                self.event_handler = None
+                self.is_connected = False

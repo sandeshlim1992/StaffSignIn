@@ -6,6 +6,7 @@ DEFAULT_SECTION = 'Settings'
 PATH_KEY = 'SaveDirectory'
 PASSWORD_KEY = 'ExcelPassword'
 TITLE_KEY = 'AppTitle'
+ADMIN_MODE_KEY = 'AdminMode'
 
 
 def get_default_save_directory():
@@ -54,3 +55,12 @@ def load_title():
         config.read(CONFIG_FILE)
         return config.get(DEFAULT_SECTION, TITLE_KEY, fallback='LSST')
     return 'LSST'
+
+def load_admin_mode():
+    """Loads the saved admin mode state, or returns False (locked)."""
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        # Convert string from config file to boolean
+        return config.getboolean(DEFAULT_SECTION, ADMIN_MODE_KEY, fallback=False)
+    return False

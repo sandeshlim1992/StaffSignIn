@@ -4,7 +4,6 @@ from PySide6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView, QMess
 from PySide6.QtGui import QFont, QColor
 from datetime import datetime, timedelta
 
-# Import all constants from the new file
 import constants as c
 
 try:
@@ -26,7 +25,7 @@ class SignInTable(QTableWidget):
                 gridline-color: {c.WIN_COLOR_BORDER_LIGHT};
             }}
             QHeaderView::section:horizontal {{
-                background-color: transparent; 
+                background-color: {c.WIN_COLOR_WINDOW_BG};
                 padding: 10px;
                 border: none; 
                 border-bottom: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
@@ -108,7 +107,7 @@ class SignInTable(QTableWidget):
 
             if target_row_excel != -1:
                 sheet[f'C{target_row_excel}'] = time_now_str
-                status_message = f"Clock Out time updated for {staff_name}"
+                status_message = f"Clocked Out: {staff_name}"
                 target_row_widget = target_row_excel - 3
             else:
                 next_row_excel = 3

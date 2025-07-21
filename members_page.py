@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont, QIcon, QAction
 
 import constants as c
+from config_manager import load_admin_mode
 
 
 class MemberDialog(QDialog):
@@ -75,13 +76,13 @@ class MembersPage(QWidget):
         page_title = QLabel("Manage Members")
         page_title.setFont(QFont(c.WIN_FONT_FAMILY, 18, QFont.Bold))
 
-        add_member_button = QPushButton("")
-        add_member_button.setIcon(QIcon("icons/user_add.svg"))
-        add_member_button.setIconSize(QSize(50, 50))
-        add_member_button.setFixedSize(60, 60)
-        add_member_button.setToolTip("Add New Member")
-        add_member_button.setCursor(Qt.PointingHandCursor)
-        add_member_button.setStyleSheet(f"""
+        self.add_member_button = QPushButton("")
+        self.add_member_button.setIcon(QIcon("icons/user_add.svg"))
+        self.add_member_button.setIconSize(QSize(50, 50))
+        self.add_member_button.setFixedSize(60, 60)
+        self.add_member_button.setToolTip("Add New Member")
+        self.add_member_button.setCursor(Qt.PointingHandCursor)
+        self.add_member_button.setStyleSheet(f"""
             QPushButton {{
                 background-color: transparent;
                 border-radius: 30px; /* half of FixedSize */
@@ -94,11 +95,11 @@ class MembersPage(QWidget):
                 background-color: {c.WIN_COLOR_CONTROL_BG_PRESSED};
             }}
         """)
-        add_member_button.clicked.connect(self.add_member)
+        self.add_member_button.clicked.connect(self.add_member)
 
         top_bar_layout.addWidget(page_title)
         top_bar_layout.addStretch()
-        top_bar_layout.addWidget(add_member_button)
+        top_bar_layout.addWidget(self.add_member_button)
         main_layout.addLayout(top_bar_layout)
 
         # --- Search and Filter Bar ---
@@ -112,7 +113,7 @@ class MembersPage(QWidget):
         search_layout.setContentsMargins(5, 0, 5, 0)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search Staff Name or Token")
+        self.search_input.setPlaceholderText("Search anything...")
         self.search_input.setStyleSheet("border: none; background-color: transparent; padding-left: 10px;")
 
         search_icon_action = QAction(self.search_input)
@@ -185,6 +186,7 @@ class MembersPage(QWidget):
 
     def load_members_data(self):
         """Reads the staff_data.csv file and populates the table."""
+        is_admin_mode_unlocked = load_admin_mode()
         self.members_table.setRowCount(0)
         try:
             with open(self.staff_file, 'r', newline='') as f:
@@ -223,6 +225,7 @@ class MembersPage(QWidget):
                     actions_layout.addWidget(edit_button)
                     actions_layout.addWidget(delete_button)
                     self.members_table.setCellWidget(row, 2, actions_widget)
+                    actions_widget.setEnabled(is_admin_mode_unlocked)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not load staff data: {e}")
 
@@ -298,3 +301,11 @@ class MembersPage(QWidget):
             self.staff_data_changed.emit()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not save changes to staff data: {e}")
+
+    def update_admin_mode_ui(self, is_unlocked):
+        """Enables or disables member controls based on admin mode."""
+        self.add_member_button.setEnabled(is_unlocked)
+        for row in range(self.members_table.rowCount()):
+            widget = self.members_table.cellWidget(row, 2)  # Column 2 is "Actions"
+            if widget:
+                widget.setEnabled(is_unlocked)
