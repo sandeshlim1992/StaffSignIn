@@ -9,9 +9,11 @@ from PySide6.QtGui import QFont
 import constants as c
 from config_manager import (
     load_path, save_setting, load_password, PASSWORD_KEY, PATH_KEY,
-    load_title, TITLE_KEY, load_admin_mode, ADMIN_MODE_KEY
+    load_title, TITLE_KEY, load_admin_mode, ADMIN_MODE_KEY,
+    load_nav_slider_enabled, NAV_SLIDER_KEY
 )
 from admin_switch import AdminSwitch
+from feature_switch import FeatureSwitch
 
 
 class SettingsPage(QWidget):
@@ -19,6 +21,7 @@ class SettingsPage(QWidget):
     A page for application settings, including a customizable save location and Excel password.
     """
     admin_mode_changed = Signal(bool)
+    nav_slider_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -43,6 +46,7 @@ class SettingsPage(QWidget):
             }}
         """)
         general_layout = QVBoxLayout(general_frame)
+        general_layout.setContentsMargins(20, 20, 20, 20)
         general_layout.setSpacing(15)
 
         general_section_label = QLabel("General")
@@ -75,6 +79,39 @@ class SettingsPage(QWidget):
         general_layout.addLayout(title_layout)
         main_layout.addWidget(general_frame)
 
+        # --- Interface Section ---
+        interface_frame = QFrame()
+        interface_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {c.WIN_COLOR_WIDGET_BG};
+                border-radius: 8px;
+                border: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
+            }}
+        """)
+        interface_layout = QVBoxLayout(interface_frame)
+        interface_layout.setContentsMargins(20, 20, 20, 20)
+        interface_layout.setSpacing(15)
+
+        interface_section_label = QLabel("Interface")
+        interface_section_label.setFont(QFont(c.WIN_FONT_FAMILY, 12, QFont.Bold))
+        interface_section_label.setStyleSheet("border: none;")
+        interface_layout.addWidget(interface_section_label)
+
+        slider_layout = QHBoxLayout()
+        slider_label = QLabel("Navigation drawer Slider:")
+        slider_label.setStyleSheet("border: none;")
+
+        self.slider_switch = FeatureSwitch()
+        self.slider_switch.set_on(load_nav_slider_enabled())
+        self.slider_switch.toggled.connect(self._on_nav_slider_toggled)
+
+        slider_layout.addWidget(slider_label)
+        slider_layout.addWidget(self.slider_switch)
+        slider_layout.addStretch()
+        interface_layout.addLayout(slider_layout)
+
+        main_layout.addWidget(interface_frame)
+
         # --- File Settings Section ---
         settings_frame = QFrame()
         settings_frame.setStyleSheet(f"""
@@ -85,6 +122,7 @@ class SettingsPage(QWidget):
             }}
         """)
         frame_layout = QVBoxLayout(settings_frame)
+        frame_layout.setContentsMargins(20, 20, 20, 20)
         frame_layout.setSpacing(15)
 
         section_label = QLabel("File Management")
@@ -160,6 +198,7 @@ class SettingsPage(QWidget):
             }}
         """)
         security_layout = QVBoxLayout(security_frame)
+        security_layout.setContentsMargins(20, 20, 20, 20)
         security_layout.setSpacing(15)
 
         security_section_label = QLabel("Security")
@@ -211,6 +250,11 @@ class SettingsPage(QWidget):
         save_setting(TITLE_KEY, new_title)
         QMessageBox.information(self, "Title Saved",
                                 "The new application title has been saved.\nPlease restart the application for the change to take effect.")
+
+    def _on_nav_slider_toggled(self, is_on):
+        """Saves and emits the nav slider state."""
+        save_setting(NAV_SLIDER_KEY, str(is_on))
+        self.nav_slider_changed.emit(is_on)
 
     def _on_admin_mode_changed(self, is_unlocked):
         """Saves and emits the admin mode state when the switch is toggled."""

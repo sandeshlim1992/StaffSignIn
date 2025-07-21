@@ -7,14 +7,14 @@ from PySide6.QtWidgets import (
     QPushButton, QFrame, QLabel, QListWidget, QListWidgetItem,
     QStackedWidget, QStatusBar, QStyle, QMessageBox
 )
-from PySide6.QtGui import QIcon, QFont
+from PySide6.QtGui import QIcon, QFont, QScreen
 
 import constants as c
 from dashboard import DashboardPage
 from members_page import MembersPage
 from settings import SettingsPage
 from system_tray import SystemTrayIcon
-from config_manager import load_title, load_admin_mode
+from config_manager import load_title, load_admin_mode, load_nav_slider_enabled
 
 
 class DatabaseSetup:
@@ -30,6 +30,7 @@ class NavigationDrawer(QFrame):
 
     def __init__(self, parent=None, full_width=250, compact_width=60):
         super().__init__(parent)
+        self._hover_enabled = True
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(f"""
             QFrame {{
@@ -145,6 +146,10 @@ class NavigationDrawer(QFrame):
         self.width_anim.valueChanged.connect(self._set_animated_width)
         self.width_anim.finished.connect(self._animation_finished)
 
+    def set_hover_enabled(self, enabled):
+        """Public method to enable or disable the hover feature."""
+        self._hover_enabled = enabled
+
     def toggle_pin(self):
         self._is_pinned = not self._is_pinned
         self.pin_button.setText(c.ICON_MENU_PINNED if self._is_pinned else c.ICON_MENU_NORMAL)
@@ -154,11 +159,13 @@ class NavigationDrawer(QFrame):
             self.close_drawer()
 
     def enterEvent(self, event: QEvent):
-        if not self._is_pinned and not self._is_open: self.open_drawer()
+        if self._hover_enabled:
+            if not self._is_pinned and not self._is_open: self.open_drawer()
         event.accept()
 
     def leaveEvent(self, event: QEvent):
-        if not self._is_pinned and self._is_open: self.close_drawer()
+        if self._hover_enabled:
+            if not self._is_pinned and self._is_open: self.close_drawer()
         event.accept()
 
     def open_drawer(self, force_open=False):
@@ -199,7 +206,11 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sign In")
-        self.setGeometry(100, 100, 1280, 800)
+        self.resize(900, 700)
+        center_point = QApplication.primaryScreen().availableGeometry().center()
+        frame_geometry = self.frameGeometry()
+        frame_geometry.moveCenter(center_point)
+        self.move(frame_geometry.topLeft())
         self.setStatusBar(QStatusBar())
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -218,6 +229,7 @@ class MainWindow(QMainWindow):
         self.members_page = MembersPage(self)
         self.settings_page = SettingsPage(self)
         self.settings_page.admin_mode_changed.connect(self._set_admin_mode)
+        self.settings_page.nav_slider_changed.connect(self.nav_drawer.set_hover_enabled)
 
         self.pages = {
             "Dashboard": self.dashboard_page,
@@ -241,6 +253,7 @@ class MainWindow(QMainWindow):
 
         # Set initial admin mode state for all pages
         self._set_admin_mode(load_admin_mode())
+        self.nav_drawer.set_hover_enabled(load_nav_slider_enabled())
 
     def setup_tray_icon(self):
         """Creates the system tray icon and connects its signals."""

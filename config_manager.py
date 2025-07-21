@@ -7,6 +7,7 @@ PATH_KEY = 'SaveDirectory'
 PASSWORD_KEY = 'ExcelPassword'
 TITLE_KEY = 'AppTitle'
 ADMIN_MODE_KEY = 'AdminMode'
+NAV_SLIDER_KEY = 'NavigationSlider'
 
 
 def get_default_save_directory():
@@ -64,3 +65,11 @@ def load_admin_mode():
         # Convert string from config file to boolean
         return config.getboolean(DEFAULT_SECTION, ADMIN_MODE_KEY, fallback=False)
     return False
+
+def load_nav_slider_enabled():
+    """Loads the saved nav slider state, or returns True (enabled)."""
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        return config.getboolean(DEFAULT_SECTION, NAV_SLIDER_KEY, fallback=True)
+    return True

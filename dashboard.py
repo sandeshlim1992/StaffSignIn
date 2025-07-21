@@ -51,7 +51,7 @@ class CalendarContainer(QFrame):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(15)
 
         # Create the main calendar
@@ -119,7 +119,7 @@ class DashboardPage(QWidget):
         self.right_panel = QWidget()
         right_layout = QVBoxLayout(self.right_panel)
         right_layout.setSpacing(15)
-        right_layout.setContentsMargins(25, 25, 25, 25)
+        right_layout.setContentsMargins(30, 30, 30, 30)
 
         title_bar_layout = QHBoxLayout()
         title_label = QLabel("Daily Sign-In Sheet")
@@ -179,6 +179,7 @@ class DashboardPage(QWidget):
             QFrame {{
                 background-color: {c.WIN_COLOR_WIDGET_BG};
                 border: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
+                border-radius: 15px;
             }}
         """)
         container_layout = QVBoxLayout(self.table_container)
@@ -208,7 +209,7 @@ class DashboardPage(QWidget):
         """)
 
         panel_layout = QVBoxLayout(self.side_panel)
-        panel_layout.setContentsMargins(15, 15, 15, 15)
+        panel_layout.setContentsMargins(25, 25, 25, 25)
         panel_layout.setSpacing(10)
 
         title = QLabel("Staff in Building")

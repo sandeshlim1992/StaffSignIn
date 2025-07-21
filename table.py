@@ -34,6 +34,12 @@ class SignInTable(QTableWidget):
                 color: {c.WIN_COLOR_TEXT_PRIMARY};
                 min-height: 40px;
             }}
+            QHeaderView::section:horizontal:first {{
+                border-top-left-radius: 15px;
+            }}
+            QHeaderView::section:horizontal:last {{
+                border-top-right-radius: 15px;
+            }}
         """
         self.setStyleSheet(self.original_stylesheet)
         self.verticalHeader().setVisible(False)

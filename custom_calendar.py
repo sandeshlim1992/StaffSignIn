@@ -90,12 +90,23 @@ class CustomCalendar(QWidget):
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(15)
+        main_layout.setSpacing(0)  # Remove spacing between header and dates
+
+        # --- Container for Header and Weekdays ---
+        header_container = QWidget()
+        header_container.setStyleSheet(f"""
+            background-color: {c.WIN_COLOR_WIDGET_BG};
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        """)
+        header_container_layout = QVBoxLayout(header_container)
+        header_container_layout.setContentsMargins(10, 10, 10, 15)
+        header_container_layout.setSpacing(15)
 
         # --- Header with Navigation ---
         header = QWidget()
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(5, 0, 5, 0)
+        header_layout.setContentsMargins(0, 0, 0, 0)
 
         prev_button = QPushButton("")
         prev_button.setIcon(QIcon("icons/left_arrow.svg"))
@@ -137,14 +148,23 @@ class CustomCalendar(QWidget):
             label.setStyleSheet(f"color: {c.WIN_COLOR_TEXT_SECONDARY};")
             self.weekday_grid.addWidget(label, 0, i)
 
-        # --- Calendar Grid for Dates ---
-        self.calendar_grid = QGridLayout()
-        self.calendar_grid.setSpacing(0)
-        self.calendar_grid.setContentsMargins(0, 5, 0, 0)
+        header_container_layout.addWidget(header)
+        header_container_layout.addLayout(self.weekday_grid)
 
-        main_layout.addWidget(header)
-        main_layout.addLayout(self.weekday_grid)
-        main_layout.addLayout(self.calendar_grid)
+        # --- Calendar Grid for Dates ---
+        date_grid_container = QWidget()
+        date_grid_container.setStyleSheet(f"""
+            background-color: {c.WIN_COLOR_WIDGET_BG};
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        """)
+
+        self.calendar_grid = QGridLayout(date_grid_container)
+        self.calendar_grid.setSpacing(0)
+        self.calendar_grid.setContentsMargins(10, 5, 10, 10)
+
+        main_layout.addWidget(header_container)
+        main_layout.addWidget(date_grid_container)
 
     def _populate_calendar(self):
         # Clear previous cells
