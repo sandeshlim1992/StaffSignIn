@@ -6,8 +6,10 @@ DEFAULT_SECTION = 'Settings'
 PATH_KEY = 'SaveDirectory'
 PASSWORD_KEY = 'ExcelPassword'
 TITLE_KEY = 'AppTitle'
+LOGO_PATH_KEY = 'LogoPath'
 ADMIN_MODE_KEY = 'AdminMode'
 NAV_SLIDER_KEY = 'NavigationSlider'
+THEME_KEY = 'Theme'
 
 
 def get_default_save_directory():
@@ -57,12 +59,19 @@ def load_title():
         return config.get(DEFAULT_SECTION, TITLE_KEY, fallback='LSST')
     return 'LSST'
 
+def load_logo_path():
+    """Loads the saved logo path from the config file, or returns an empty string."""
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        return config.get(DEFAULT_SECTION, LOGO_PATH_KEY, fallback='')
+    return ''
+
 def load_admin_mode():
     """Loads the saved admin mode state, or returns False (locked)."""
     config = configparser.ConfigParser()
     if os.path.exists(CONFIG_FILE):
         config.read(CONFIG_FILE)
-        # Convert string from config file to boolean
         return config.getboolean(DEFAULT_SECTION, ADMIN_MODE_KEY, fallback=False)
     return False
 
@@ -73,3 +82,11 @@ def load_nav_slider_enabled():
         config.read(CONFIG_FILE)
         return config.getboolean(DEFAULT_SECTION, NAV_SLIDER_KEY, fallback=True)
     return True
+
+def load_theme():
+    """Loads the saved theme from the config file, or returns 'light'."""
+    config = configparser.ConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+        return config.get(DEFAULT_SECTION, THEME_KEY, fallback='light')
+    return 'light'

@@ -1,11 +1,14 @@
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QSystemTrayIcon, QMenu
 from PySide6.QtGui import QIcon, QAction
 
 
 class SystemTrayIcon(QSystemTrayIcon):
     """
-    A class for managing the application's system tray icon and notifications.
+    A class for managing the application's system tray icon.
+    It emits a signal when a notification is requested.
     """
+    notification_requested = Signal(str, str) # title, message
 
     def __init__(self, icon_path, parent=None):
         super().__init__(parent)
@@ -23,13 +26,6 @@ class SystemTrayIcon(QSystemTrayIcon):
 
         self.setContextMenu(self.menu)
 
-    def show_notification(self, title, message, icon=QSystemTrayIcon.MessageIcon.Information):
-        """
-        Displays a native system tray balloon message.
-
-        Args:
-            title (str): The title of the notification.
-            message (str): The main body of the notification.
-            icon (QSystemTrayIcon.MessageIcon): The icon to display (Information, Warning, Critical).
-        """
-        self.showMessage(title, message, icon, 3000)  # Show for 3 seconds
+    def show_notification(self, title, message):
+        """Emits a signal requesting a notification to be shown."""
+        self.notification_requested.emit(title, message)

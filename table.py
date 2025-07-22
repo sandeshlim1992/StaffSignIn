@@ -23,9 +23,17 @@ class SignInTable(QTableWidget):
             QTableWidget {{ 
                 border: none; 
                 gridline-color: {c.WIN_COLOR_BORDER_LIGHT};
+                background-color: {c.WIN_COLOR_WIDGET_BG};
+            }}
+            QTableWidget::item {{
+                border-bottom: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
+            }}
+            QTableWidget::item:selected {{
+                background-color: {c.WIN_COLOR_CONTROL_BG_HOVER};
+                color: {c.WIN_COLOR_TEXT_PRIMARY};
             }}
             QHeaderView::section:horizontal {{
-                background-color: {c.WIN_COLOR_WINDOW_BG};
+                background-color: {c.TABLE_HEADER_BG};
                 padding: 10px;
                 border: none; 
                 border-bottom: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
@@ -34,11 +42,8 @@ class SignInTable(QTableWidget):
                 color: {c.WIN_COLOR_TEXT_PRIMARY};
                 min-height: 40px;
             }}
-            QHeaderView::section:horizontal:first {{
-                border-top-left-radius: 15px;
-            }}
-            QHeaderView::section:horizontal:last {{
-                border-top-right-radius: 15px;
+            QTableCornerButton::section {{
+                background-color: {c.TABLE_HEADER_BG};
             }}
         """
         self.setStyleSheet(self.original_stylesheet)
@@ -47,6 +52,9 @@ class SignInTable(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
     def display_excel_content(self, file_path):
         """
@@ -81,7 +89,7 @@ class SignInTable(QTableWidget):
             return file_date_str
 
         except Exception as e:
-            QMessageBox.critical(self, "Error Reading File", f"Could not read the Excel file:\n\n{e}")
+            QMessageBox.critical(self, "Error Reading File", f"Could not read the Excel file:\\n\\n{e}")
             return None
 
     def record_swipe(self, file_path, staff_name):
@@ -130,11 +138,11 @@ class SignInTable(QTableWidget):
 
         except PermissionError:
             QMessageBox.critical(self, "Permission Denied",
-                                 f"Could not save to Excel.\nPlease make sure the file is not open.")
+                                 f"Could not save to Excel.\\nPlease make sure the file is not open.")
             return "Save failed: Permission Denied.", -1
         except Exception as e:
             QMessageBox.critical(self, "Error Saving File",
-                                 f"An unexpected error occurred while saving to Excel:\n\n{e}")
+                                 f"An unexpected error occurred while saving to Excel:\\n\\n{e}")
             return "Save failed: An unexpected error occurred.", -1
 
     def highlight_row(self, row_index, color=QColor("#D4EDDA")):
@@ -142,31 +150,22 @@ class SignInTable(QTableWidget):
         if row_index < 0 or row_index >= self.rowCount():
             return
 
-        highlight_stylesheet = self.original_stylesheet.replace(
-            f"gridline-color: {c.WIN_COLOR_BORDER_LIGHT};",
-            f"gridline-color: {color.name()};"
-        )
-        self.setStyleSheet(highlight_stylesheet)
-
-        original_brushes = []
         for col in range(self.columnCount()):
             item = self.item(row_index, col)
             if not item:
                 item = QTableWidgetItem()
                 self.setItem(row_index, col, item)
-            original_brushes.append(item.background())
             item.setBackground(color)
 
-        QTimer.singleShot(1200, lambda: self.end_highlight(row_index, original_brushes))
+        QTimer.singleShot(1200, lambda: self.end_highlight(row_index))
 
-    def end_highlight(self, row_index, original_brushes):
-        """Reverts the background color of a row and restores the grid."""
+    def end_highlight(self, row_index):
+        """Reverts the background color of a row to the default."""
+        default_color = QColor(c.WIN_COLOR_WIDGET_BG)
         for col in range(self.columnCount()):
             item = self.item(row_index, col)
-            if item and col < len(original_brushes):
-                item.setBackground(original_brushes[col])
-
-        self.setStyleSheet(self.original_stylesheet)
+            if item:
+                item.setBackground(default_color)
 
     def get_staff_in_building(self):
         """

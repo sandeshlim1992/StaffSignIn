@@ -1,7 +1,7 @@
 import os
 import csv
 from datetime import date, datetime
-from PySide6.QtCore import Qt, QDate, Slot, QSize, QPropertyAnimation, QEasingCurve, QPoint, Signal, QObject
+from PySide6.QtCore import Qt, QDate, Slot, QSize, QPropertyAnimation, QEasingCurve, QPoint, Signal, QObject, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QLabel, QFrame,
     QStackedWidget, QTableWidgetItem, QCalendarWidget, QToolButton, QListWidget, QListWidgetItem,
@@ -13,7 +13,7 @@ import constants as c
 from table import SignInTable
 from reader_thread import PaxtonReaderThread
 from dialogs import ask_for_name
-from toast import ToastNotification
+from system_toast import SystemToast
 from Generate import generate_staff_sign_in_form
 from config_manager import load_path
 from custom_calendar import CustomCalendar
@@ -54,34 +54,30 @@ class CalendarContainer(QFrame):
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(15)
 
-        # Create the main calendar
         self.calendar = CustomCalendar(self)
         self.calendar.selection_changed.connect(self.selection_changed.emit)
         self.calendar.month_changed.connect(self._update_next_month_display)
 
-        # Create the second calendar for the next month
         self.next_month_calendar = CustomCalendar(self)
-        self.next_month_calendar.setEnabled(False)  # Make it non-interactive
+        self.next_month_calendar.setEnabled(False)
 
-        # Update button text, size, and font
         self.generate_button = QPushButton("Open")
         self.generate_button.setFixedHeight(36)
-        self.generate_button.setFixedWidth(80)  # Set a smaller fixed width
+        self.generate_button.setFixedWidth(80)
         self.generate_button.setFont(QFont(c.WIN_FONT_FAMILY, 10, QFont.Bold))
         self.generate_button.setProperty("primary", True)
 
-        # New layout to center the button
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         button_layout.addWidget(self.generate_button)
         button_layout.addStretch()
 
         layout.addWidget(self.calendar)
-        layout.addLayout(button_layout)  # Add centered button
-        layout.addWidget(self.next_month_calendar)  # Add second calendar
-        layout.addStretch()  # Move stretch to the end
+        layout.addLayout(button_layout)
+        layout.addWidget(self.next_month_calendar)
+        layout.addStretch()
 
-        self._update_next_month_display()  # Set initial state
+        self._update_next_month_display()
 
     def _update_next_month_display(self):
         """Updates the second calendar to show the month after the main one."""
@@ -177,9 +173,8 @@ class DashboardPage(QWidget):
         self.table_container = QFrame()
         self.table_container.setStyleSheet(f"""
             QFrame {{
-                background-color: {c.WIN_COLOR_WIDGET_BG};
-                border: 1px solid {c.WIN_COLOR_BORDER_LIGHT};
-                border-radius: 15px;
+                background-color: transparent;
+                border: none;
             }}
         """)
         container_layout = QVBoxLayout(self.table_container)
@@ -268,7 +263,6 @@ class DashboardPage(QWidget):
         if self.side_panel.isHidden():
             self.side_panel.move(self.right_panel.width(), 0)
         self.side_panel.setFixedHeight(self.right_panel.height())
-        self.reposition_toasts()
 
     def on_view_sheet_clicked(self):
         selected_date = self.calendar_container.selected_date()
@@ -298,7 +292,7 @@ class DashboardPage(QWidget):
     @Slot(int)
     def process_card_swipe(self, token):
         if not self.current_file_path:
-            self.show_toast("Action Required", "Please generate a sheet before swiping cards.", status='warning')
+            self.show_toast("Action Required", "Please generate a sheet before swiping cards.")
             return
 
         if self.is_processing_swipe: return
@@ -311,19 +305,21 @@ class DashboardPage(QWidget):
                 parts = status.split(': ', 1)
                 if len(parts) == 2:
                     action, name = parts
-                    rich_message = f"{action}: <b><font color='{c.WIN_COLOR_ACCENT_PRIMARY}'>{name}</font></b>"
-                else:
-                    rich_message = status
-
-                if "Clocked In" in status:
-                    self.show_toast("Success", rich_message, status='success')
-                elif "Clocked Out" in status:
-                    self.show_toast("Information", rich_message, status='info')
-                else:
-                    self.show_toast("Warning", rich_message, status='warning')
+                    if "Clocked In" in action:
+                        self.show_toast(action, name, status='success')
+                    elif "Clocked Out" in action:
+                        self.show_toast(action, name, status='error')
 
                 self.display_excel_content(self.current_file_path)
-                self.table_widget.highlight_row(row_to_highlight)
+
+                # --- MODIFICATION START: Determine highlight color and use QTimer ---
+                highlight_color = QColor("#D4EDDA")  # Green for Clock In
+                if "Clocked Out" in status:
+                    highlight_color = QColor("#F8D7DA")  # Red for Clock Out
+
+                # Use a singleShot timer to apply the highlight after the event loop settles
+                QTimer.singleShot(0, lambda: self.table_widget.highlight_row(row_to_highlight, highlight_color))
+                # --- MODIFICATION END ---
             else:
                 self.register_new_user(token)
         finally:
@@ -350,13 +346,11 @@ class DashboardPage(QWidget):
         parts = status.split(': ', 1)
         if len(parts) == 2:
             action, name = parts
-            rich_message = f"{action}: <b><font color='{c.WIN_COLOR_ACCENT_PRIMARY}'>{name}</font></b>"
-        else:
-            rich_message = status
+            self.show_toast(action, name, status='success')
 
-        self.show_toast("Success", rich_message, status='success')
         self.display_excel_content(self.current_file_path)
-        self.table_widget.highlight_row(row_to_highlight)
+        # New users are always clocking in, so highlight is always green
+        QTimer.singleShot(0, lambda: self.table_widget.highlight_row(row_to_highlight, QColor("#D4EDDA")))
 
     def generate_or_load_sheet_for_date(self, selected_date):
         save_dir = load_path()
@@ -397,7 +391,6 @@ class DashboardPage(QWidget):
 
     @Slot(QDate)
     def update_view_button_state(self, selected_qdate=None):
-        # If not called by a signal, get the date manually
         if selected_qdate is None:
             selected_qdate = self.calendar_container.selected_date()
 
@@ -412,13 +405,10 @@ class DashboardPage(QWidget):
             file_date_str = os.path.splitext(base_name)[0]
             file_date = datetime.strptime(file_date_str, "%m-%d-%Y").date()
 
-            # Convert the QDate to a Python date for comparison
             py_date = selected_qdate.toPython()
 
             is_sheet_open = (file_date == py_date)
             button.setEnabled(not is_sheet_open)
-
-            # Set text to "Open" for both states
             button.setText("Open")
 
         except (ValueError, TypeError):
@@ -446,44 +436,11 @@ class DashboardPage(QWidget):
             self.members_button.setToolTip(f"{count} staff members are currently in the building.")
 
     def show_toast(self, title, message, status='info'):
-        """Creates and positions a new toast notification."""
-        main_window = self.window()
-        if not main_window:
-            print("Error: Could not find main window to parent toast.")
-            return
-
-        toast = ToastNotification(main_window, title, message, status)
-
-        toast.closing.connect(self.on_toast_destroyed)
+        """Creates and shows a system toast notification."""
+        toast = SystemToast(title, message, status=status)
         self.active_toasts.append(toast)
-
-        self.reposition_toasts()
+        toast.finished.connect(lambda: self.active_toasts.remove(toast))
         toast.show_toast()
-
-    def reposition_toasts(self):
-        """Stacks all active toasts neatly in the bottom-right corner."""
-        main_window = self.window()
-        if not main_window: return
-
-        parent_rect = main_window.geometry()
-        y_pos = parent_rect.height() - 20
-
-        for toast in reversed(self.active_toasts):
-            if toast.isWidgetType():
-                toast_size = toast.sizeHint()
-                y_pos -= (toast_size.height() + 10)
-                x_pos = parent_rect.width() - toast_size.width() - 20
-
-                global_pos = main_window.mapToGlobal(QPoint(x_pos, y_pos))
-                toast.move(global_pos)
-
-    @Slot(QObject)
-    def on_toast_destroyed(self, obj):
-        """Removes a toast from the active list when it's closed."""
-        if obj in self.active_toasts:
-            self.active_toasts.remove(obj)
-        self.reposition_toasts()
-        obj.deleteLater()
 
     @Slot(str)
     def show_reader_error(self, message):

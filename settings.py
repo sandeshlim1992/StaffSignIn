@@ -10,10 +10,12 @@ import constants as c
 from config_manager import (
     load_path, save_setting, load_password, PASSWORD_KEY, PATH_KEY,
     load_title, TITLE_KEY, load_admin_mode, ADMIN_MODE_KEY,
-    load_nav_slider_enabled, NAV_SLIDER_KEY
+    load_nav_slider_enabled, NAV_SLIDER_KEY, load_theme, THEME_KEY,
+    load_logo_path, LOGO_PATH_KEY
 )
 from admin_switch import AdminSwitch
 from feature_switch import FeatureSwitch
+from theme_switch import ThemeSwitch
 
 
 class SettingsPage(QWidget):
@@ -22,6 +24,8 @@ class SettingsPage(QWidget):
     """
     admin_mode_changed = Signal(bool)
     nav_slider_changed = Signal(bool)
+    theme_changed = Signal(str)
+    logo_changed = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,6 +81,31 @@ class SettingsPage(QWidget):
         title_layout.addWidget(self.title_input, 1)
         title_layout.addWidget(self.save_title_button)
         general_layout.addLayout(title_layout)
+
+        # --- MODIFICATION START: Logo Selection ---
+        logo_layout = QHBoxLayout()
+        logo_field_label = QLabel("Application Logo:")
+        logo_field_label.setStyleSheet("border: none;")
+        self.logo_path_display = QLineEdit()
+        self.logo_path_display.setText(load_logo_path())
+        self.logo_path_display.setReadOnly(True)
+        self.logo_path_display.setStyleSheet(f"""
+            QLineEdit {{
+                border: 1px solid {c.WIN_COLOR_BORDER_MEDIUM};
+                background-color: #f8f8f8;
+                padding: 5px;
+                border-radius: {c.WIN_BORDER_RADIUS};
+            }}
+        """)
+        self.browse_logo_button = QPushButton("Browse...")
+        self.browse_logo_button.clicked.connect(self.select_logo_file)
+
+        logo_layout.addWidget(logo_field_label)
+        logo_layout.addWidget(self.logo_path_display, 1)
+        logo_layout.addWidget(self.browse_logo_button)
+        general_layout.addLayout(logo_layout)
+        # --- MODIFICATION END ---
+
         main_layout.addWidget(general_frame)
 
         # --- Interface Section ---
@@ -109,6 +138,20 @@ class SettingsPage(QWidget):
         slider_layout.addWidget(self.slider_switch)
         slider_layout.addStretch()
         interface_layout.addLayout(slider_layout)
+
+        # Add the theme switch
+        theme_mode_layout = QHBoxLayout()
+        theme_mode_label = QLabel("Appearance:")
+        theme_mode_label.setStyleSheet("border: none;")
+
+        self.theme_switch = ThemeSwitch()
+        self.theme_switch.set_dark_mode(load_theme() == "dark")
+        self.theme_switch.toggled.connect(self._on_theme_changed)
+
+        theme_mode_layout.addWidget(theme_mode_label)
+        theme_mode_layout.addStretch()
+        theme_mode_layout.addWidget(self.theme_switch)
+        interface_layout.addLayout(theme_mode_layout)
 
         main_layout.addWidget(interface_frame)
 
@@ -228,7 +271,7 @@ class SettingsPage(QWidget):
         if new_dir and new_dir != current_path:
             save_setting(PATH_KEY, new_dir)
             self.path_display.setText(new_dir)
-            QMessageBox.information(self, "Path Saved", f"New save directory has been set to:\n{new_dir}")
+            QMessageBox.information(self, "Path Saved", f"New save directory has been set to:\\n{new_dir}")
 
     def save_excel_password(self):
         """Saves the new Excel password to the config file."""
@@ -249,12 +292,36 @@ class SettingsPage(QWidget):
 
         save_setting(TITLE_KEY, new_title)
         QMessageBox.information(self, "Title Saved",
-                                "The new application title has been saved.\nPlease restart the application for the change to take effect.")
+                                "The new application title has been saved.\\nPlease restart the application for the change to take effect.")
+
+    # --- MODIFICATION START: New method to select logo ---
+    def select_logo_file(self):
+        """Opens a dialog to select a new logo image."""
+        current_path = os.path.dirname(self.logo_path_display.text())
+        new_file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Logo Image",
+            current_path,
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.svg)"
+        )
+
+        if new_file:
+            save_setting(LOGO_PATH_KEY, new_file)
+            self.logo_path_display.setText(new_file)
+            self.logo_changed.emit(new_file)
+            QMessageBox.information(self, "Logo Saved", f"New logo has been set to:\\n{new_file}")
+
+    # --- MODIFICATION END ---
 
     def _on_nav_slider_toggled(self, is_on):
         """Saves and emits the nav slider state."""
         save_setting(NAV_SLIDER_KEY, str(is_on))
         self.nav_slider_changed.emit(is_on)
+
+    def _on_theme_changed(self, theme_name):
+        """Saves and emits the theme state."""
+        save_setting(THEME_KEY, theme_name)
+        self.theme_changed.emit(theme_name)
 
     def _on_admin_mode_changed(self, is_unlocked):
         """Saves and emits the admin mode state when the switch is toggled."""
@@ -266,3 +333,4 @@ class SettingsPage(QWidget):
         self.save_title_button.setEnabled(is_unlocked)
         self.browse_button.setEnabled(is_unlocked)
         self.save_password_button.setEnabled(is_unlocked)
+        self.browse_logo_button.setEnabled(is_unlocked)

@@ -113,7 +113,7 @@ class MembersPage(QWidget):
         search_layout.setContentsMargins(5, 0, 5, 0)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search anything...")
+        self.search_input.setPlaceholderText("Search Name or Token...")
         self.search_input.setStyleSheet("border: none; background-color: transparent; padding-left: 10px;")
 
         search_icon_action = QAction(self.search_input)

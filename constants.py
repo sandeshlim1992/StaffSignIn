@@ -37,6 +37,10 @@ TOAST_SUCCESS_BORDER = "#4CAF50"
 TOAST_INFO_BORDER = "#0078D4"
 TOAST_WARNING_BORDER = "#FFC107"
 
+# --- MODIFICATION START: Added specific color for table header ---
+TABLE_HEADER_BG = "#E1EAF2"
+# --- MODIFICATION END ---
+
 # --- Fonts ---
 WIN_FONT_FAMILY = "Segoe UI Variable"
 WIN_FONT_FAMILY_FALLBACK = "Segoe UI"
