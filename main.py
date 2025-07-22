@@ -75,14 +75,18 @@ class NavigationDrawer(QFrame):
                 outline: none; /* Removes the focus border */
             }}
             QListWidget::item:hover {{
-                background-color: {c.WIN_COLOR_CONTROL_BG_HOVER};
+                background-color: #E6F0F8; /* A very light blue for hover */
                 color: {c.WIN_COLOR_TEXT_PRIMARY};
             }}
             QListWidget::item:selected {{
-                background-color: {c.WIN_COLOR_ACCENT_PRIMARY_HOVER};
-                color: {c.WIN_COLOR_ACCENT_TEXT_ON_PRIMARY};
+                background-color: #DDEBF8; /* A slightly darker light blue for selected background */
+                color: {c.WIN_COLOR_TEXT_PRIMARY}; /* Change text color to primary text for better contrast on light blue */
                 border-left: 3px solid {c.WIN_COLOR_ACCENT_PRIMARY};
                 padding-left: 5px;
+            }}
+            /* Add a specific style for selected item text when hovered if needed */
+            QListWidget::item:selected:hover {{
+                background-color: #CDE3F4; /* Even lighter blue when selected AND hovered */
             }}
         """)
         self.nav_list.setMouseTracking(True)
@@ -130,8 +134,8 @@ class NavigationDrawer(QFrame):
         self._set_item_texts_visibility(False)
 
         self.width_anim = QVariantAnimation(self)
+        self.width_anim.setEasingCurve(QEasingCurve.Type.InOutCubic) # Corrected line
         self.width_anim.setDuration(250)
-        self.width_anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
         self.width_anim.valueChanged.connect(self._set_animated_width)
         self.width_anim.finished.connect(self._animation_finished)
 
@@ -335,7 +339,6 @@ if __name__ == "__main__":
     app.setQuitOnLastWindowClosed(False)
 
     # Set the application icon for the title bar
-    # Replace 'icons/app_icon.ico' with the actual path to your .ico file
     app.setWindowIcon(QIcon("icons/app_icon.png"))
 
     app.setStyleSheet(c.APP_STYLESHEET)
