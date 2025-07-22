@@ -18,6 +18,7 @@ from Generate import generate_staff_sign_in_form
 from config_manager import load_path
 from custom_calendar import CustomCalendar
 
+
 STAFF_FILE = 'staff_data.csv'
 
 
@@ -151,7 +152,7 @@ class DashboardPage(QWidget):
         self.members_count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.members_count_label.setStyleSheet(f"""
             QLabel {{
-                background-color: {c.WIN_COLOR_ACCENT_PRIMARY};
+                background-color: #21BF73; /* Changed to green */
                 color: {c.WIN_COLOR_ACCENT_TEXT_ON_PRIMARY};
                 border-radius: 10px;
                 border: 1px solid {c.WIN_COLOR_WIDGET_BG};

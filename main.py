@@ -21,7 +21,7 @@ from system_toast import SystemToast
 
 class DatabaseSetup:
     def setup_database(self):
-        print("Mock database setup complete.")
+        print("Mock database complete.")
 
 
 database_setup = DatabaseSetup()
@@ -52,18 +52,14 @@ class NavigationDrawer(QFrame):
         # --- Logo and Title Handling ---
         self.logo_label = QLabel()
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # --- MODIFICATION START: Center the widget in the layout ---
         self.drawer_layout.addWidget(self.logo_label, 0, Qt.AlignmentFlag.AlignCenter)
-        # --- MODIFICATION END ---
 
         self.title_label = QLabel(load_title())
         font = QFont(c.WIN_FONT_FAMILY, c.WIN_FONT_SIZE_TITLE, QFont.Bold)
         self.title_label.setFont(font)
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet(f"color: {c.WIN_COLOR_TEXT_PRIMARY};")
-        # --- MODIFICATION START: Center the widget in the layout ---
         self.drawer_layout.addWidget(self.title_label, 0, Qt.AlignmentFlag.AlignCenter)
-        # --- MODIFICATION END ---
 
         self.nav_list = QListWidget()
         self.nav_list.setIconSize(QSize(28, 28))
@@ -223,7 +219,7 @@ class MainWindow(QMainWindow):
         self.main_layout = QHBoxLayout(self.central_widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(0)
-        self.nav_drawer = NavigationDrawer(self.central_widget)
+        self.nav_drawer = NavigationDrawer(self.central_widget, full_width=250, compact_width=60)
         self.main_layout.addWidget(self.nav_drawer)
         self.content_pane = QWidget()
         self.content_pane_layout = QVBoxLayout(self.content_pane)
@@ -275,7 +271,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.notification_requested.connect(self.show_system_toast)
 
     def on_tray_icon_activated(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        if reason == QApplication.DoubleClick:
             self.restore_window()
 
     def restore_window(self):
@@ -331,12 +327,16 @@ if __name__ == "__main__":
     if sys.platform == 'win32':
         import ctypes
 
-        myappid = u'mycompany.signinapp.1.0'
+        myappid = 'mycompany.signinapp.1.0'
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
     database_setup.setup_database()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
+
+    # Set the application icon for the title bar
+    # Replace 'icons/app_icon.ico' with the actual path to your .ico file
+    app.setWindowIcon(QIcon("icons/app_icon.png"))
 
     app.setStyleSheet(c.APP_STYLESHEET)
 

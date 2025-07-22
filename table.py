@@ -145,7 +145,7 @@ class SignInTable(QTableWidget):
                                  f"An unexpected error occurred while saving to Excel:\\n\\n{e}")
             return "Save failed: An unexpected error occurred.", -1
 
-    def highlight_row(self, row_index, color=QColor("#D4EDDA")):
+    def highlight_row(self, row_index, color):
         """Temporarily highlights a specific row with a solid color."""
         if row_index < 0 or row_index >= self.rowCount():
             return
