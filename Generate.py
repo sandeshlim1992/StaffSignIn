@@ -25,7 +25,7 @@ def generate_staff_sign_in_form(target_date: date):
                          bottom=Side(style='thin'))
 
     # --- Row 1: Main Title and Date ---
-    ws.merge_cells('A1:B1')
+    ws.merge_cells('A1:D1')
     ws['A1'] = "STAFF SIGN IN FORM"
     ws['A1'].font = white_bold_font_row1
     ws['A1'].fill = dark_green_fill
@@ -33,34 +33,46 @@ def generate_staff_sign_in_form(target_date: date):
     ws['A1'].border = thin_border
 
     date_str = target_date.strftime("%#m/%#d/%Y")
-    ws['C1'] = date_str
-    ws['C1'].font = white_bold_font_row1
-    ws['C1'].fill = dark_green_fill
-    ws['C1'].alignment = Alignment(horizontal='right', vertical='center')
-    ws['C1'].border = thin_border
+    ws.merge_cells('E1:E1')
+    ws['E1'] = date_str
+    ws['E1'].font = white_bold_font_row1
+    ws['E1'].fill = dark_green_fill
+    ws['E1'].alignment = Alignment(horizontal='right', vertical='center')
+    ws['E1'].border = thin_border
     ws.row_dimensions[1].height = 35
 
     # --- Row 2: Column Headers ---
-    headers = ["STAFF NAME", "Clock In", "Clock Out"]
+    headers = ["STAFF NAME", "Clock In", "Clock Out", "Remarks", "All Taps"]
     for col_idx, header_text in enumerate(headers, 1):
         cell = ws.cell(row=2, column=col_idx, value=header_text)
         cell.font = black_bold_font_row2
         cell.border = thin_border
-        cell.alignment = Alignment(horizontal='left', vertical='center')
+        # MODIFICATION: Changed vertical alignment to 'top'
+        cell.alignment = Alignment(horizontal='left', vertical='top')
     ws.row_dimensions[2].height = 25
 
-    # --- MODIFICATION: Apply Borders to the first 200 data rows ---
-    for row_idx in range(3, 203):  # Loop from row 3 to 202
-        for col_idx in range(1, 4):  # Columns A, B, C
+    # --- Apply Borders and Alignment to data rows ---
+    for row_idx in range(3, 203):
+        for col_idx in range(1, 6):  # Columns A, B, C, D, E
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.border = thin_border
 
+            # MODIFICATION: Set default alignment for the row
+            alignment_setting = Alignment(vertical='top')
+
+            # MODIFICATION: Apply special wrap text alignment for Column E
+            if col_idx == 5:
+                alignment_setting = Alignment(vertical='top', wrap_text=True)
+
+            cell.alignment = alignment_setting
+
     # --- Set Column Widths ---
     ws.column_dimensions['A'].width = 45
-    ws.column_dimensions['B'].width = 30
-    ws.column_dimensions['C'].width = 30
+    ws.column_dimensions['B'].width = 25
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 30  # Remarks column
+    ws.column_dimensions['E'].width = 50
 
-    # --- MODIFICATION: Freeze the top two rows ---
     ws.freeze_panes = 'A3'
 
     ws.protection.sheet = True

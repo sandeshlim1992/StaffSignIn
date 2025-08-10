@@ -12,6 +12,10 @@ from PySide6.QtGui import QFont, QIcon, QAction
 
 import constants as c
 from config_manager import load_admin_mode
+# --- MODIFICATION: Import database functions ---
+from database_manager import (
+    get_all_staff, add_staff_member, update_staff_member, delete_staff_member, get_staff_by_token
+)
 
 
 class MemberDialog(QDialog):
@@ -64,7 +68,7 @@ class MembersPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
-        self.staff_file = 'staff_data.csv'
+        # self.staff_file = 'staff_data.csv' # No longer needed
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(25, 25, 25, 25)
@@ -185,49 +189,49 @@ class MembersPage(QWidget):
         self.load_members_data()
 
     def load_members_data(self):
-        """Reads the staff_data.csv file and populates the table."""
+        """Reads staff data from the database and populates the table."""
         is_admin_mode_unlocked = load_admin_mode()
         self.members_table.setRowCount(0)
-        try:
-            with open(self.staff_file, 'r', newline='') as f:
-                reader = csv.reader(f)
-                header = next(reader)
-                for row_data in reader:
-                    if not row_data: continue
-                    row = self.members_table.rowCount()
-                    self.members_table.insertRow(row)
 
-                    token_item = QTableWidgetItem(row_data[0])
-                    name_item = QTableWidgetItem(row_data[1])
+        staff_list = get_all_staff()
 
-                    self.members_table.setItem(row, 0, name_item)
-                    self.members_table.setItem(row, 1, token_item)
+        for member in staff_list:
+            row = self.members_table.rowCount()
+            self.members_table.insertRow(row)
 
-                    actions_widget = QWidget()
-                    actions_layout = QHBoxLayout(actions_widget)
-                    actions_layout.setContentsMargins(5, 0, 5, 0)
-                    actions_layout.setSpacing(10)
+            # Columns are now Name, Token
+            name_item = QTableWidgetItem(member['name'])
+            token_item = QTableWidgetItem(str(member['token']))
 
-                    edit_button = QToolButton()
-                    edit_button.setIcon(QIcon("icons/edit_icon.svg"))
-                    edit_button.setToolTip("Edit Member")
-                    edit_button.setCursor(Qt.PointingHandCursor)
-                    edit_button.setStyleSheet("QToolButton { border: none; }")
-                    edit_button.clicked.connect(partial(self.edit_member, row))
+            # Store the token in the item for later retrieval
+            token_item.setData(Qt.ItemDataRole.UserRole, member['token'])
 
-                    delete_button = QToolButton()
-                    delete_button.setIcon(QIcon("icons/close_icon.svg"))
-                    delete_button.setToolTip("Delete Member")
-                    delete_button.setCursor(Qt.PointingHandCursor)
-                    delete_button.setStyleSheet("QToolButton { border: none; }")
-                    delete_button.clicked.connect(partial(self.delete_member, row))
+            self.members_table.setItem(row, 0, name_item)
+            self.members_table.setItem(row, 1, token_item)
 
-                    actions_layout.addWidget(edit_button)
-                    actions_layout.addWidget(delete_button)
-                    self.members_table.setCellWidget(row, 2, actions_widget)
-                    actions_widget.setEnabled(is_admin_mode_unlocked)
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not load staff data: {e}")
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(5, 0, 5, 0)
+            actions_layout.setSpacing(10)
+
+            edit_button = QToolButton()
+            edit_button.setIcon(QIcon("icons/edit_icon.svg"))
+            edit_button.setToolTip("Edit Member")
+            edit_button.setCursor(Qt.PointingHandCursor)
+            edit_button.setStyleSheet("QToolButton { border: none; }")
+            edit_button.clicked.connect(partial(self.edit_member, row))
+
+            delete_button = QToolButton()
+            delete_button.setIcon(QIcon("icons/close_icon.svg"))
+            delete_button.setToolTip("Delete Member")
+            delete_button.setCursor(Qt.PointingHandCursor)
+            delete_button.setStyleSheet("QToolButton { border: none; }")
+            delete_button.clicked.connect(partial(self.delete_member, row))
+
+            actions_layout.addWidget(edit_button)
+            actions_layout.addWidget(delete_button)
+            self.members_table.setCellWidget(row, 2, actions_widget)
+            actions_widget.setEnabled(is_admin_mode_unlocked)
 
     def filter_table(self):
         """Hides rows that don't match the search text."""
@@ -246,66 +250,71 @@ class MembersPage(QWidget):
         if dialog.exec():
             data = dialog.get_data()
             if data:
-                for row in range(self.members_table.rowCount()):
-                    if self.members_table.item(row, 1).text() == str(data["token"]):
-                        QMessageBox.warning(self, "Duplicate Token", "This token number is already registered.")
-                        return
+                token = data["token"]
+                name = data["name"]
 
-                with open(self.staff_file, 'a', newline='') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([data["token"], data["name"]])
+                # Check if token already exists in the database
+                if get_staff_by_token(token):
+                    QMessageBox.warning(self, "Duplicate Token", "This token number is already registered.")
+                    return
 
-                self.load_members_data()
-                self.staff_data_changed.emit()
+                if add_staff_member(token, name):
+                    QMessageBox.information(self, "Success", f"Member '{name}' added successfully.")
+                    self.load_members_data()
+                    self.staff_data_changed.emit()
+                else:
+                    QMessageBox.critical(self, "Database Error",
+                                         "Could not add the new member due to a database error.")
 
     def edit_member(self, row):
         """Opens a dialog to edit an existing member."""
         name = self.members_table.item(row, 0).text()
-        token = self.members_table.item(row, 1).text()
+        token_item = self.members_table.item(row, 1)
+        original_token = token_item.data(Qt.ItemDataRole.UserRole)
 
         dialog = MemberDialog("Edit Member", self)
         dialog.name_input.setText(name)
-        dialog.token_input.setText(token)
+        dialog.token_input.setText(str(original_token))
 
         if dialog.exec():
             data = dialog.get_data()
             if data:
-                self.update_csv_data(row, data)
+                new_token = data["token"]
+                new_name = data["name"]
+
+                # If token is changed, check if the new one is a duplicate
+                if new_token != original_token and get_staff_by_token(new_token):
+                    QMessageBox.warning(self, "Duplicate Token",
+                                        "The new token number is already registered to another member.")
+                    return
+
+                if update_staff_member(original_token, new_token, new_name):
+                    QMessageBox.information(self, "Success", "Member details updated successfully.")
+                    self.load_members_data()
+                    self.staff_data_changed.emit()
+                else:
+                    QMessageBox.critical(self, "Database Error", "Could not update member details.")
 
     def delete_member(self, row):
         """Deletes a member after confirmation."""
         name = self.members_table.item(row, 0).text()
+        token_item = self.members_table.item(row, 1)
+        token = token_item.data(Qt.ItemDataRole.UserRole)
+
         reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete {name}?",
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
-            self.update_csv_data(row, None)
-
-    def update_csv_data(self, row_to_change, new_data):
-        """Rewrites the entire CSV file with the updated data."""
-        all_data = []
-        for row in range(self.members_table.rowCount()):
-            if row == row_to_change:
-                if new_data:
-                    all_data.append([str(new_data["token"]), new_data["name"]])
+            if delete_staff_member(token):
+                QMessageBox.information(self, "Success", f"Member '{name}' deleted.")
+                self.load_members_data()
+                self.staff_data_changed.emit()
             else:
-                if row != row_to_change:
-                    all_data.append([self.members_table.item(row, 1).text(), self.members_table.item(row, 0).text()])
-
-        try:
-            with open(self.staff_file, 'w', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow(['Token', 'StaffName'])
-                writer.writerows(all_data)
-
-            self.load_members_data()
-            self.staff_data_changed.emit()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not save changes to staff data: {e}")
+                QMessageBox.critical(self, "Database Error", "Could not delete the member.")
 
     def update_admin_mode_ui(self, is_unlocked):
         """Enables or disables member controls based on admin mode."""
         self.add_member_button.setEnabled(is_unlocked)
         for row in range(self.members_table.rowCount()):
-            widget = self.members_table.cellWidget(row, 2)  # Column 2 is "Actions"
+            widget = self.members_table.cellWidget(row, 2)
             if widget:
                 widget.setEnabled(is_unlocked)

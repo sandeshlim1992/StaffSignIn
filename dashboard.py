@@ -1,13 +1,11 @@
 import os
-import csv
 from datetime import date, datetime
-from PySide6.QtCore import Qt, QDate, Slot, QSize, QPropertyAnimation, QEasingCurve, QPoint, Signal, QObject, QTimer
+from PySide6.QtCore import Qt, QDate, Slot, QSize, QPropertyAnimation, QEasingCurve, QPoint, Signal, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QLabel, QFrame,
-    QStackedWidget, QTableWidgetItem, QCalendarWidget, QToolButton, QListWidget, QListWidgetItem,
-    QGraphicsOpacityEffect
+    QListWidget, QListWidgetItem, QToolButton
 )
-from PySide6.QtGui import QFont, QColor, QTextCharFormat, QIcon
+from PySide6.QtGui import QFont, QColor, QIcon
 
 import constants as c
 from table import SignInTable
@@ -17,9 +15,7 @@ from system_toast import SystemToast
 from Generate import generate_staff_sign_in_form
 from config_manager import load_path
 from custom_calendar import CustomCalendar
-
-
-STAFF_FILE = 'staff_data.csv'
+from database_manager import log_tap_event, get_all_staff, add_staff_member, get_taps_for_staff_and_date
 
 
 class Scrim(QWidget):
@@ -152,7 +148,7 @@ class DashboardPage(QWidget):
         self.members_count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.members_count_label.setStyleSheet(f"""
             QLabel {{
-                background-color: #21BF73; /* Changed to green */
+                background-color: {c.WIN_COLOR_ACCENT_PRIMARY};
                 color: {c.WIN_COLOR_ACCENT_TEXT_ON_PRIMARY};
                 border-radius: 10px;
                 border: 1px solid {c.WIN_COLOR_WIDGET_BG};
@@ -278,17 +274,10 @@ class DashboardPage(QWidget):
 
     def load_staff_data(self):
         try:
-            if not os.path.exists(STAFF_FILE):
-                with open(STAFF_FILE, 'w', newline='') as f: writer = csv.writer(f); writer.writerow(
-                    ['Token', 'StaffName'])
-                self.staff_data = {}
-                return
-            with open(STAFF_FILE, 'r', newline='') as f:
-                reader = csv.reader(f)
-                next(reader)
-                self.staff_data = {int(row[0]): row[1] for row in reader if row}
+            all_staff = get_all_staff()
+            self.staff_data = {member['token']: member['name'] for member in all_staff}
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Could not load staff data: {e}")
+            QMessageBox.critical(self, "Database Error", f"Could not load staff data from database: {e}")
 
     @Slot(int)
     def process_card_swipe(self, token):
@@ -301,7 +290,52 @@ class DashboardPage(QWidget):
             self.is_processing_swipe = True
             if token in self.staff_data:
                 staff_name = self.staff_data[token]
-                status, row_to_highlight = self.table_widget.record_swipe(self.current_file_path, staff_name)
+
+                try:
+                    file_name = os.path.basename(self.current_file_path)
+                    date_part = os.path.splitext(file_name)[0]
+                    sheet_date = datetime.strptime(date_part, '%m-%d-%Y').date()
+                    query_date_str = sheet_date.strftime('%Y-%m-%d')
+
+                    previous_taps = get_taps_for_staff_and_date(staff_name, query_date_str)
+                    total_taps_today = len(previous_taps) + 1
+
+                    first_tap_time = previous_taps[0] if previous_taps else None
+
+                    now_time = datetime.now().time()
+                    full_datetime = datetime.combine(sheet_date, now_time)
+                    db_timestamp = full_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                    db_event_date = full_datetime.strftime("%Y-%m-%d")
+                    log_tap_event(staff_name, token, db_timestamp, db_event_date)
+
+                    time_now_str = full_datetime.strftime("%I:%M:%S %p")
+
+                    # First, update the Excel file in the background
+                    status, _ = self.table_widget.record_swipe(
+                        self.current_file_path, staff_name, time_now_str,
+                        total_taps_today, first_tap_time_str=first_tap_time
+                    )
+
+                    # MODIFICATION: Instead of reloading the whole table, update the view directly.
+                    # This is faster and avoids the visual glitch.
+                    row_to_highlight = self.table_widget.update_view_for_swipe(
+                        staff_name, time_now_str, total_taps_today
+                    )
+
+                except Exception as e:
+                    # Fallback logic remains largely the same
+                    log_tap_event(staff_name, token)
+                    time_now_str = datetime.now().strftime("%I:%M:%S %p")
+                    total_taps_today = 1
+                    status, _ = self.table_widget.record_swipe(
+                        self.current_file_path, staff_name, time_now_str,
+                        total_taps_today, first_tap_time_str=None
+                    )
+                    row_to_highlight = self.table_widget.update_view_for_swipe(
+                        staff_name, time_now_str, total_taps_today
+                    )
+                    QMessageBox.warning(self, "Logic Error",
+                                        f"Could not determine tap count, used fallback logic.\n{e}")
 
                 parts = status.split(': ', 1)
                 if len(parts) == 2:
@@ -310,17 +344,14 @@ class DashboardPage(QWidget):
                         self.show_toast(action, name, status='success')
                     elif "Clocked Out" in action:
                         self.show_toast(action, name, status='error')
+                    else:
+                        self.show_toast(action, name, status='info')
 
-                self.display_excel_content(self.current_file_path)
+                # MODIFICATION: Do NOT reload the entire table from the file anymore.
+                # self.display_excel_content(self.current_file_path)
 
-                # --- MODIFICATION START: Determine highlight color and use QTimer ---
-                highlight_color = QColor("#D4EDDA")  # Green for Clock In
-                if "Clocked Out" in status:
-                    highlight_color = QColor("#F8D7DA")  # Red for Clock Out
-
-                # Use a singleShot timer to apply the highlight after the event loop settles
-                QTimer.singleShot(0, lambda: self.table_widget.highlight_row(row_to_highlight, highlight_color))
-                # --- MODIFICATION END ---
+                highlight_color = QColor(c.WIN_COLOR_ACCENT_PRIMARY)
+                self.table_widget.highlight_row(row_to_highlight, highlight_color)
             else:
                 self.register_new_user(token)
         finally:
@@ -333,25 +364,51 @@ class DashboardPage(QWidget):
             self.show_toast("Cancelled", "Registration cancelled.", status='info')
             return
 
-        self.staff_data[token] = user_name
-        try:
-            with open(STAFF_FILE, 'a', newline='') as f:
-                writer = csv.writer(f)
-                writer.writerow([token, user_name])
-        except Exception as e:
-            self.show_reader_error(f"Failed to save new staff member: {e}")
+        if not add_staff_member(token, user_name):
+            QMessageBox.warning(self, "Registration Failed", "This token or name may already be in use.")
             return
 
-        status, row_to_highlight = self.table_widget.record_swipe(self.current_file_path, user_name)
+        self.staff_data[token] = user_name
+
+        total_taps_today = 1
+        full_datetime = None
+        try:
+            file_name = os.path.basename(self.current_file_path)
+            date_part = os.path.splitext(file_name)[0]
+            sheet_date = datetime.strptime(date_part, '%m-%d-%Y').date()
+
+            now_time = datetime.now().time()
+            full_datetime = datetime.combine(sheet_date, now_time)
+            db_timestamp = full_datetime.strftime("%Y-%m-%d %H:%M:%S")
+            db_event_date = full_datetime.strftime("%Y-%m-%d")
+            log_tap_event(user_name, token, db_timestamp, db_event_date)
+        except Exception:
+            log_tap_event(user_name, token)
+
+        if self.parent_window and hasattr(self.parent_window, 'members_page'):
+            self.parent_window.members_page.staff_data_changed.emit()
+
+        time_now_str = full_datetime.strftime("%I:%M:%S %p") if full_datetime else datetime.now().strftime(
+            "%I:%M:%S %p")
+
+        # Update Excel file
+        status, _ = self.table_widget.record_swipe(
+            self.current_file_path, user_name, time_now_str, total_taps_today, first_tap_time_str=None
+        )
+
+        # Update view
+        row_to_highlight = self.table_widget.update_view_for_swipe(user_name, time_now_str, total_taps_today)
 
         parts = status.split(': ', 1)
         if len(parts) == 2:
             action, name = parts
             self.show_toast(action, name, status='success')
 
-        self.display_excel_content(self.current_file_path)
-        # New users are always clocking in, so highlight is always green
-        QTimer.singleShot(0, lambda: self.table_widget.highlight_row(row_to_highlight, QColor("#D4EDDA")))
+        # Do not reload table
+        # self.display_excel_content(self.current_file_path)
+
+        highlight_color = QColor(c.WIN_COLOR_ACCENT_PRIMARY)
+        self.table_widget.highlight_row(row_to_highlight, highlight_color)
 
     def generate_or_load_sheet_for_date(self, selected_date):
         save_dir = load_path()
@@ -437,7 +494,6 @@ class DashboardPage(QWidget):
             self.members_button.setToolTip(f"{count} staff members are currently in the building.")
 
     def show_toast(self, title, message, status='info'):
-        """Creates and shows a system toast notification."""
         toast = SystemToast(title, message, status=status)
         self.active_toasts.append(toast)
         toast.finished.connect(lambda: self.active_toasts.remove(toast))
